@@ -5,15 +5,15 @@ import { AppText } from '@/components/atoms/AppText';
 import { TopBar } from '@/components/organisms/TopBar';
 import { ThemedView } from '@/components/themed-view';
 
-export default function HomeScreen() {
+export default function AgendaScreen() {
   return (
     <ThemedView style={styles.container}>
       <TopBar onNotificationsPress={() => {}} />
       <ScrollView style={styles.content}>
         <View style={styles.section}>
-          <AppText variant="subtitle">Home</AppText>
+          <AppText variant="subtitle">Agenda</AppText>
           <AppText variant="body" style={styles.paragraph}>
-            Bem-vindo ao app Exemplo. Esta tela usa Atomic Design: TopBar (organism), AppText (atom).
+            Aqui você pode ver seus compromissos e eventos. (Tela de exemplo para a aula.)
           </AppText>
         </View>
       </ScrollView>
