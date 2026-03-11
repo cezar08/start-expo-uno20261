@@ -1,23 +1,40 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 
 import { AppText } from '@/components/atoms/AppText';
+import { AddTaskForm } from '@/components/molecules/AddTaskForm';
+import { TaskList } from '@/components/organisms/TaskList';
 import { TopBar } from '@/components/organisms/TopBar';
+import { TasksProvider, useTasks } from '@/contexts/TasksContext';
 import { ThemedView } from '@/components/themed-view';
 
-export default function HomeScreen() {
+function HomeScreenContent() {
+  const { tasks, addTask, toggleTask, deleteTask, isLoading } = useTasks();
+
   return (
     <ThemedView style={styles.container}>
       <TopBar onNotificationsPress={() => {}} />
-      <ScrollView style={styles.content}>
+      <View style={styles.content}>
         <View style={styles.section}>
-          <AppText variant="subtitle">Home</AppText>
-          <AppText variant="body" style={styles.paragraph}>
-            Bem-vindo ao app Exemplo. Esta tela usa Atomic Design: TopBar (organism), AppText (atom).
-          </AppText>
+          <AppText variant="subtitle">Tarefas</AppText>
+          <AddTaskForm onSubmit={addTask} />
         </View>
-      </ScrollView>
+        <TaskList
+          tasks={tasks}
+          onToggle={toggleTask}
+          onDelete={deleteTask}
+          isLoading={isLoading}
+        />
+      </View>
     </ThemedView>
+  );
+}
+
+export default function HomeScreen() {
+  return (
+    <TasksProvider>
+      <HomeScreenContent />
+    </TasksProvider>
   );
 }
 
@@ -27,12 +44,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    paddingHorizontal: 20,
   },
   section: {
-    padding: 20,
-  },
-  paragraph: {
-    marginTop: 8,
-    opacity: 0.9,
+    paddingVertical: 16,
+    gap: 12,
   },
 });
