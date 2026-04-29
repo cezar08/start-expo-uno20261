@@ -1,73 +1,138 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import NetInfo from '@react-native-community/netinfo';
 
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  createTaskRequest,
+  deleteTaskRequest,
+  listTasksRequest,
+  toggleTaskRequest,
+} from '@/services/tasksApi';
 import type { Task } from '@/types/task';
-
-const STORAGE_KEY = '@exemplo/tasks';
 
 type TasksContextType = {
   tasks: Task[];
-  addTask: (title: string) => void;
-  toggleTask: (id: string) => void;
-  deleteTask: (id: string) => void;
+  addTask: (title: string) => Promise<void>;
+  toggleTask: (id: string) => Promise<void>;
+  deleteTask: (id: string) => Promise<void>;
+  refreshTasks: () => Promise<void>;
   isLoading: boolean;
+  errorMessage: string | null;
+  isOffline: boolean;
 };
 
 const TasksContext = createContext<TasksContextType | null>(null);
 
-function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2);
-}
-
 export function TasksProvider({ children }: { children: React.ReactNode }) {
+  const { token } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
 
-  // Carrega tarefas do AsyncStorage ao montar o componente
-  useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw) as Task[];
-          setTasks(Array.isArray(parsed) ? parsed : []);
-        }
-      } catch {
-        setTasks([]);
-      } finally {
-        setIsLoading(false);
-      }
-    })();
+  const checkConnection = useCallback(async () => {
+    const state = await NetInfo.fetch();
+    const connected = Boolean(state.isConnected && state.isInternetReachable !== false);
+    setIsOffline(!connected);
+    return connected;
   }, []);
 
-  // Persiste tarefas no AsyncStorage sempre que a lista mudar
-  useEffect(() => {
-    if (!isLoading) {
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)).catch(() => {});
+  const refreshTasks = useCallback(async () => {
+    if (!token) {
+      setTasks([]);
+      setIsLoading(false);
+      return;
     }
-  }, [tasks, isLoading]);
 
-  const addTask = useCallback((title: string) => {
+    const connected = await checkConnection();
+    if (!connected) {
+      setErrorMessage('Dispositivo offline. Conectar para sincronizar tarefas.');
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const remoteTasks = await listTasksRequest(token);
+      setTasks(remoteTasks);
+    } catch {
+      setErrorMessage('Falha ao carregar tarefas da API.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [checkConnection, token]);
+
+  useEffect(() => {
+    refreshTasks().catch(() => {});
+  }, [refreshTasks]);
+
+  const addTask = useCallback(async (title: string) => {
     const trimmed = title.trim();
-    if (!trimmed) return;
-    setTasks((prev) => [
-      ...prev,
-      { id: generateId(), title: trimmed, completed: false, createdAt: Date.now() },
-    ]);
-  }, []);
+    if (!trimmed || !token) return;
 
-  const toggleTask = useCallback((id: string) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
-    );
-  }, []);
+    const connected = await checkConnection();
+    if (!connected) {
+      setErrorMessage('Sem conexao. A tarefa nao foi enviada.');
+      return;
+    }
 
-  const deleteTask = useCallback((id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
-  }, []);
+    setErrorMessage(null);
+    try {
+      const created = await createTaskRequest(token, trimmed);
+      setTasks((prev) => [created, ...prev]);
+    } catch {
+      setErrorMessage('Falha ao criar tarefa na API.');
+    }
+  }, [checkConnection, token]);
+
+  const toggleTask = useCallback(async (id: string) => {
+    if (!token) return;
+    const connected = await checkConnection();
+    if (!connected) {
+      setErrorMessage('Sem conexao. Nao foi possivel atualizar tarefa.');
+      return;
+    }
+
+    setErrorMessage(null);
+    try {
+      const updated = await toggleTaskRequest(token, id);
+      setTasks((prev) => prev.map((task) => (task.id === id ? updated : task)));
+    } catch {
+      setErrorMessage('Falha ao atualizar tarefa.');
+    }
+  }, [checkConnection, token]);
+
+  const deleteTask = useCallback(async (id: string) => {
+    if (!token) return;
+    const connected = await checkConnection();
+    if (!connected) {
+      setErrorMessage('Sem conexao. Nao foi possivel remover tarefa.');
+      return;
+    }
+
+    setErrorMessage(null);
+    try {
+      await deleteTaskRequest(token, id);
+      setTasks((prev) => prev.filter((task) => task.id !== id));
+    } catch {
+      setErrorMessage('Falha ao remover tarefa.');
+    }
+  }, [checkConnection, token]);
 
   return (
-    <TasksContext.Provider value={{ tasks, addTask, toggleTask, deleteTask, isLoading }}>
+    <TasksContext.Provider
+      value={{
+        tasks,
+        addTask,
+        toggleTask,
+        deleteTask,
+        refreshTasks,
+        isLoading,
+        errorMessage,
+        isOffline,
+      }}
+    >
       {children}
     </TasksContext.Provider>
   );

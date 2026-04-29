@@ -1,20 +1,22 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 
+import { AppText } from '@/components/atoms/AppText';
 import { Button } from '@/components/atoms/Button';
 import { InputWithLabel } from '@/components/molecules/InputWithLabel';
 
 export type LoginFormProps = {
-  onSubmit: (email: string, password: string) => void;
+  onSubmit: (email: string, password: string) => Promise<void>;
   loading?: boolean;
+  errorMessage?: string | null;
 };
 
-export function LoginForm({ onSubmit, loading = false }: LoginFormProps) {
+export function LoginForm({ onSubmit, loading = false, errorMessage }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleSubmit = () => {
-    onSubmit(email, password);
+  const handleSubmit = async () => {
+    await onSubmit(email, password);
   };
 
   return (
@@ -41,8 +43,16 @@ export function LoginForm({ onSubmit, loading = false }: LoginFormProps) {
           title="Entrar"
           onPress={handleSubmit}
           loading={loading}
+          disabled={!email.trim() || !password || loading}
           style={styles.button}
         />
+        {errorMessage ? (
+          <View style={styles.errorWrap}>
+            <AppText variant="caption" style={styles.errorText}>
+              {errorMessage}
+            </AppText>
+          </View>
+        ) : null}
       </View>
     </KeyboardAvoidingView>
   );
@@ -59,5 +69,11 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 8,
+  },
+  errorWrap: {
+    marginTop: 12,
+  },
+  errorText: {
+    color: '#d64045',
   },
 });

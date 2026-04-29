@@ -5,14 +5,15 @@ import { Button } from '@/components/atoms/Button';
 import { Input } from '@/components/atoms/Input';
 
 export type AddTaskFormProps = {
-  onSubmit: (title: string) => void;
+  onSubmit: (title: string) => Promise<void>;
 };
 
 export function AddTaskForm({ onSubmit }: AddTaskFormProps) {
   const [title, setTitle] = useState('');
 
-  const handleSubmit = () => {
-    onSubmit(title);
+  const handleSubmit = async () => {
+    if (!title.trim()) return;
+    await onSubmit(title);
     setTitle('');
   };
 

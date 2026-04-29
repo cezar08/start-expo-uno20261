@@ -1,23 +1,33 @@
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 import { AppText } from '@/components/atoms/AppText';
 import { LoginForm } from '@/components/molecules/LoginForm';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { login } = useAuth();
+  const { login, authError } = useAuth();
+  const { isConnected } = useNetworkStatus();
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (email: string, password: string) => {
+  const handleSubmit = async (email: string, password: string) => {
+    if (isConnected === false) {
+      Alert.alert('Sem internet', 'Conectar o dispositivo para autenticar.');
+      return;
+    }
+
     setLoading(true);
-    login(email, password);
-    setLoading(false);
-    router.replace('/(tabs)');
+    try {
+      await login(email, password);
+      router.replace('/(tabs)');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -30,7 +40,7 @@ export default function LoginScreen() {
           Entre com seu e-mail e senha para continuar.
         </AppText>
       </View>
-      <LoginForm onSubmit={handleSubmit} loading={loading} />
+      <LoginForm onSubmit={handleSubmit} loading={loading} errorMessage={authError} />
     </View>
   );
 }

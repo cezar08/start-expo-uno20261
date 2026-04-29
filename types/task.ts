@@ -1,6 +1,6 @@
 export type Task = {
   id: string;
-  title: string;  
+  title: string;
   completed: boolean;
-  createdAt: number;
+  createdAt: string;
 };
