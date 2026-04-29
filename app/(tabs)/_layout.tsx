@@ -42,6 +42,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="style-lab"
+        options={{
+          title: 'Estilo',
+          tabBarIcon: ({ color }) => <MaterialIcons name="palette" size={26} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="explore"
         options={{
           href: null,
