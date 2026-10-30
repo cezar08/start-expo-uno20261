@@ -23,8 +23,10 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      await login(email, password);
-      router.replace('/(tabs)');
+      const authenticated = await login(email, password);
+      if (authenticated) {
+        router.replace('/(tabs)');
+      }
     } finally {
       setLoading(false);
     }

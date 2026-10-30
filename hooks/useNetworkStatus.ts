@@ -8,6 +8,7 @@ export function useNetworkStatus() {
     const unsubscribe = NetInfo.addEventListener((state) => {
       setIsConnected(Boolean(state.isConnected && state.isInternetReachable === true));
     });
+    
 
     return unsubscribe;
   }, []);

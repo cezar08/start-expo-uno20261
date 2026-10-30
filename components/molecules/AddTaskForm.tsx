@@ -5,7 +5,7 @@ import { Button } from '@/components/atoms/Button';
 import { Input } from '@/components/atoms/Input';
 
 export type AddTaskFormProps = {
-  onSubmit: (title: string) => Promise<void>;
+  onSubmit: (title: string) => Promise<boolean>;
 };
 
 export function AddTaskForm({ onSubmit }: AddTaskFormProps) {
@@ -13,8 +13,10 @@ export function AddTaskForm({ onSubmit }: AddTaskFormProps) {
 
   const handleSubmit = async () => {
     if (!title.trim()) return;
-    await onSubmit(title);
-    setTitle('');
+    const wasAdded = await onSubmit(title);
+    if (wasAdded) {
+      setTitle('');
+    }
   };
 
   return (

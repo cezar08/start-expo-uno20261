@@ -1,9 +1,44 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { Platform } from 'react-native';
 
 import { loginRequest } from '@/services/authApi';
+import { getRequestErrorMessage } from '@/services/requestError';
 
 const AUTH_STORAGE_KEY = '@exemplo/auth';
+
+async function getStoredSession() {
+  if (Platform.OS === 'web') {
+    return AsyncStorage.getItem(AUTH_STORAGE_KEY);
+  }
+
+  const secureSession = await SecureStore.getItemAsync(AUTH_STORAGE_KEY);
+  if (secureSession) return secureSession;
+
+  const legacySession = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
+  if (!legacySession) return null;
+
+  await SecureStore.setItemAsync(AUTH_STORAGE_KEY, legacySession);
+  await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
+  return legacySession;
+}
+
+function setStoredSession(session: string) {
+  return Platform.OS === 'web'
+    ? AsyncStorage.setItem(AUTH_STORAGE_KEY, session)
+    : SecureStore.setItemAsync(AUTH_STORAGE_KEY, session);
+}
+
+async function removeStoredSession() {
+  if (Platform.OS === 'web') {
+    await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
+    return;
+  }
+
+  await SecureStore.deleteItemAsync(AUTH_STORAGE_KEY);
+  await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
+}
 
 type User = {
   id: string;
@@ -17,7 +52,7 @@ type AuthContextType = {
   user: User | null;
   isAuthLoading: boolean;
   authError: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
 };
 
@@ -33,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
+        const raw = await getStoredSession();
         if (!raw) return;
 
         const session = JSON.parse(raw) as { token: string; user: User };
@@ -58,21 +93,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (!normalizedEmail || !password) {
       setAuthError('Informe e-mail e senha para entrar.');
-      throw new Error('Credenciais invalidas');
+      return false;
     }
 
     try {
       const payload = await loginRequest(normalizedEmail, password);
+      await setStoredSession(JSON.stringify({ token: payload.token, user: payload.user }));
       setToken(payload.token);
       setUser(payload.user);
       setIsAuthenticated(true);
-      await AsyncStorage.setItem(
-        AUTH_STORAGE_KEY,
-        JSON.stringify({ token: payload.token, user: payload.user })
-      );
-    } catch {
-      setAuthError('Falha no login. Verifique credenciais e conexao.');
-      throw new Error('Falha no login');
+      return true;
+    } catch (error) {
+      setAuthError(getRequestErrorMessage(error, 'Não foi possível entrar. Tente novamente.'));
+      return false;
     }
   }, []);
 
@@ -81,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null);
     setUser(null);
     setAuthError(null);
-    await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
+    await removeStoredSession();
   }, []);
 
   return (

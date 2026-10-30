@@ -8,11 +8,12 @@ import {
   listTasksRequest,
   toggleTaskRequest,
 } from '@/services/tasksApi';
+import { getRequestErrorMessage } from '@/services/requestError';
 import type { Task } from '@/types/task';
 
 type TasksContextType = {
   tasks: Task[];
-  addTask: (title: string) => Promise<void>;
+  addTask: (title: string) => Promise<boolean>;
   toggleTask: (id: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   refreshTasks: () => Promise<void>;
@@ -44,79 +45,82 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const connected = await checkConnection();
-    if (!connected) {
-      setErrorMessage('Dispositivo offline. Conectar para sincronizar tarefas.');
-      setIsLoading(false);
-      return;
-    }
-
     setIsLoading(true);
     setErrorMessage(null);
     try {
+      const connected = await checkConnection();
+      if (!connected) {
+        setErrorMessage('Dispositivo offline. Conecte-se para sincronizar tarefas.');
+        return;
+      }
+
       const remoteTasks = await listTasksRequest(token);
       setTasks(remoteTasks);
-    } catch {
-      setErrorMessage('Falha ao carregar tarefas da API.');
+    } catch (error) {
+      setErrorMessage(getRequestErrorMessage(error, 'Não foi possível carregar as tarefas.'));
     } finally {
       setIsLoading(false);
     }
   }, [checkConnection, token]);
 
   useEffect(() => {
-    refreshTasks().catch(() => {});
+    void refreshTasks();
   }, [refreshTasks]);
 
   const addTask = useCallback(async (title: string) => {
     const trimmed = title.trim();
-    if (!trimmed || !token) return;
+    if (!trimmed || !token) return false;
 
-    const connected = await checkConnection();
-    if (!connected) {
-      setErrorMessage('Sem conexao. A tarefa nao foi enviada.');
-      return;
-    }
-
-    setErrorMessage(null);
     try {
+      const connected = await checkConnection();
+      if (!connected) {
+        setErrorMessage('Sem conexão. A tarefa não foi enviada.');
+        return false;
+      }
+
+      setErrorMessage(null);
       const created = await createTaskRequest(token, trimmed);
       setTasks((prev) => [created, ...prev]);
-    } catch {
-      setErrorMessage('Falha ao criar tarefa na API.');
+      return true;
+    } catch (error) {
+      setErrorMessage(getRequestErrorMessage(error, 'Não foi possível criar a tarefa.'));
+      return false;
     }
   }, [checkConnection, token]);
 
   const toggleTask = useCallback(async (id: string) => {
     if (!token) return;
-    const connected = await checkConnection();
-    if (!connected) {
-      setErrorMessage('Sem conexao. Nao foi possivel atualizar tarefa.');
-      return;
-    }
 
-    setErrorMessage(null);
     try {
+      const connected = await checkConnection();
+      if (!connected) {
+        setErrorMessage('Sem conexão. Não foi possível atualizar a tarefa.');
+        return;
+      }
+
+      setErrorMessage(null);
       const updated = await toggleTaskRequest(token, id);
       setTasks((prev) => prev.map((task) => (task.id === id ? updated : task)));
-    } catch {
-      setErrorMessage('Falha ao atualizar tarefa.');
+    } catch (error) {
+      setErrorMessage(getRequestErrorMessage(error, 'Não foi possível atualizar a tarefa.'));
     }
   }, [checkConnection, token]);
 
   const deleteTask = useCallback(async (id: string) => {
     if (!token) return;
-    const connected = await checkConnection();
-    if (!connected) {
-      setErrorMessage('Sem conexao. Nao foi possivel remover tarefa.');
-      return;
-    }
 
-    setErrorMessage(null);
     try {
+      const connected = await checkConnection();
+      if (!connected) {
+        setErrorMessage('Sem conexão. Não foi possível remover a tarefa.');
+        return;
+      }
+
+      setErrorMessage(null);
       await deleteTaskRequest(token, id);
       setTasks((prev) => prev.filter((task) => task.id !== id));
-    } catch {
-      setErrorMessage('Falha ao remover tarefa.');
+    } catch (error) {
+      setErrorMessage(getRequestErrorMessage(error, 'Não foi possível remover a tarefa.'));
     }
   }, [checkConnection, token]);
 
