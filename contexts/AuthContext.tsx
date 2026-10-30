@@ -7,19 +7,20 @@ import { loginRequest } from '@/services/authApi';
 import { getRequestErrorMessage } from '@/services/requestError';
 
 const AUTH_STORAGE_KEY = '@exemplo/auth';
+const SECURE_AUTH_STORAGE_KEY = 'exemplo.auth';
 
 async function getStoredSession() {
   if (Platform.OS === 'web') {
     return AsyncStorage.getItem(AUTH_STORAGE_KEY);
   }
 
-  const secureSession = await SecureStore.getItemAsync(AUTH_STORAGE_KEY);
+  const secureSession = await SecureStore.getItemAsync(SECURE_AUTH_STORAGE_KEY);
   if (secureSession) return secureSession;
 
   const legacySession = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
   if (!legacySession) return null;
 
-  await SecureStore.setItemAsync(AUTH_STORAGE_KEY, legacySession);
+  await SecureStore.setItemAsync(SECURE_AUTH_STORAGE_KEY, legacySession);
   await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
   return legacySession;
 }
@@ -27,7 +28,7 @@ async function getStoredSession() {
 function setStoredSession(session: string) {
   return Platform.OS === 'web'
     ? AsyncStorage.setItem(AUTH_STORAGE_KEY, session)
-    : SecureStore.setItemAsync(AUTH_STORAGE_KEY, session);
+    : SecureStore.setItemAsync(SECURE_AUTH_STORAGE_KEY, session);
 }
 
 async function removeStoredSession() {
@@ -36,7 +37,7 @@ async function removeStoredSession() {
     return;
   }
 
-  await SecureStore.deleteItemAsync(AUTH_STORAGE_KEY);
+  await SecureStore.deleteItemAsync(SECURE_AUTH_STORAGE_KEY);
   await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
 }
 
@@ -96,15 +97,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
 
+    let stage: 'api-request' | 'session-storage' = 'api-request';
+
     try {
       const payload = await loginRequest(normalizedEmail, password);
+      stage = 'session-storage';
       await setStoredSession(JSON.stringify({ token: payload.token, user: payload.user }));
       setToken(payload.token);
       setUser(payload.user);
       setIsAuthenticated(true);
       return true;
     } catch (error) {
-      setAuthError(getRequestErrorMessage(error, 'Não foi possível entrar. Tente novamente.'));
+      console.error('[AuthContext] Login failed', {
+        stage,
+        platform: Platform.OS,
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+
+      setAuthError(
+        stage === 'session-storage'
+          ? 'Login realizado, mas não foi possível salvar a sessão neste dispositivo.'
+          : getRequestErrorMessage(error, 'Não foi possível entrar. Tente novamente.'),
+      );
       return false;
     }
   }, []);
